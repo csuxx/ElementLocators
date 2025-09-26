@@ -129,7 +129,12 @@ class SelectorGenerator {
 
         // 如果设置了显示通知，则显示通知
         if (this.settings.showNotification) {
-            this.showNotification(`${this.lastStrategyUsed}选择器已生成: ${selector}`);
+            const matchCount = document.querySelectorAll(selector).length;
+            if (matchCount === 1) {
+                this.showNotification(`${this.lastStrategyUsed}选择器已生成: ${selector}`);
+            } else {
+                this.showNotification(`${this.lastStrategyUsed}选择器已生成(匹配${matchCount}个元素): ${selector}`);
+            }
         }
     }
 
@@ -488,14 +493,61 @@ class SelectorGenerator {
 
     tryFallbackSelector(element) {
         // 最终回退：使用相对稳定的路径
-        const selector = this.generateStablePath(element);
-
+        console.log('开始生成回退选择器');
+        
+        // 策略1：尝试使用文本内容进行精确定位（对span元素特别有效）
+        if (element.tagName.toLowerCase() === 'span' && element.textContent) {
+            const textSelector = this.generateTextBasedSelector(element);
+            if (textSelector && this.isUnique(textSelector)) {
+                console.log('使用文本选择器:', textSelector);
+                return textSelector;
+            }
+        }
+        
+        // 策略2：生成精确的类路径
+        const preciseSelector = this.generatePreciseClassPath(element);
+        if (this.isUnique(preciseSelector)) {
+            console.log('使用精确类路径:', preciseSelector);
+            return preciseSelector;
+        }
+        
+        // 策略3：传统稳定路径
+        const stableSelector = this.generateStablePath(element);
+        console.log('使用稳定路径:', stableSelector);
+        
         // 添加提示信息，表明这是保底选择器
         if (this.settings.showNotification) {
-            this.showNotification('使用了保底路径选择器，可能不够稳定');
+            const uniqueCount = document.querySelectorAll(stableSelector).length;
+            this.showNotification(`使用了保底路径选择器，匹配${uniqueCount}个元素`);
         }
 
-        return selector;
+        return stableSelector;
+    }
+    
+    generateTextBasedSelector(element) {
+        const text = element.textContent?.trim();
+        if (!text || text.length > 100) return null;
+        
+        // 只使用文本的前30个字符作为特征
+        const shortText = text.substring(0, 30);
+        
+        // 先尝试精确匹配
+        const exactMatches = Array.from(document.querySelectorAll('span')).filter(span => 
+            span.textContent?.trim() === text
+        );
+        
+        if (exactMatches.length === 1) {
+            // 找到唯一匹配，用父元素作为上下文
+            const parent = element.parentElement;
+            if (parent) {
+                const parentIdentifier = this.getParentIdentifier(parent);
+                if (parentIdentifier) {
+                    return `${parentIdentifier} span`;
+                }
+            }
+        }
+        
+        return null;
     }
 
     generateStablePath(element, maxDepth = 5) {
@@ -504,7 +556,7 @@ class SelectorGenerator {
         let depth = 0;
 
         while (current && depth < maxDepth) {
-            const part = this.getElementIdentifier(current);
+            const part = this.getElementIdentifierEnhanced(current, depth === 0);
             path.unshift(part);
 
             // 使用空格而不是 > 作为选择器连接符
@@ -517,8 +569,8 @@ class SelectorGenerator {
             depth++;
         }
 
-        // 使用空格而不是 > 作为选择器连接符
-        return path.join(' ');
+        // 如果路径仍然不唯一，尝试添加位置信息
+        return this.enhancePathWithPosition(element, path.join(' '));
     }
 
     generateUniquePath(element) {
@@ -580,6 +632,168 @@ class SelectorGenerator {
         return tagName;
     }
 
+    getElementIdentifierEnhanced(element, isTarget = false) {
+        const tagName = element.tagName.toLowerCase();
+
+        // 对于目标元素，尝试更多的识别策略
+        if (isTarget) {
+            // 1. 尝试使用文本内容作为特征（如果文本够短且唯一）
+            const textContent = element.textContent?.trim();
+            if (textContent && textContent.length > 0 && textContent.length < 100) {
+                // 检查是否有包含这个文本的唯一选择器
+                const textSelector = `${tagName}:contains("${CSS.escape(textContent.substring(0, 30))}")`;
+                // 注意：:contains 不是标准CSS选择器，我们用属性选择来模拟
+                if (element.textContent === textContent) {
+                    // 可以考虑使用xpath或其他方式，这里先跳过
+                }
+            }
+        }
+
+        // 获取更多有意义的class组合
+        const meaningfulClasses = Array.from(element.classList || [])
+            .filter(cls => this.isMeaningfulClass(cls))
+            .slice(0, 2); // 增加到2个class
+
+        if (meaningfulClasses.length > 0) {
+            return `${tagName}.${meaningfulClasses.join('.')}`;
+        }
+
+        // 尝试使用更稳定的class（放宽条件）
+        const stableClasses = Array.from(element.classList || [])
+            .filter(cls => this.isStableClass(cls))
+            .slice(0, 1);
+
+        if (stableClasses.length > 0) {
+            return `${tagName}.${stableClasses[0]}`;
+        }
+
+        // 使用属性
+        const stableAttrs = ['name', 'type', 'role', 'aria-label', 'tabindex'];
+        for (const attr of stableAttrs) {
+            const value = element.getAttribute(attr);
+            if (value && this.isStableIdentifier(value)) {
+                return `${tagName}[${attr}="${CSS.escape(value)}"]`;
+            }
+        }
+
+        // 使用位置信息
+        const parent = element.parentElement;
+        if (parent) {
+            const siblings = Array.from(parent.children)
+                .filter(child => child.tagName === element.tagName);
+            if (siblings.length > 1) {
+                const index = siblings.indexOf(element) + 1;
+                return `${tagName}:nth-child(${index})`;
+            }
+        }
+
+        return tagName;
+    }
+
+    enhancePathWithPosition(element, basePath) {
+        // 如果基础路径不唯一，尝试添加更精确的位置信息
+        if (this.isUnique(basePath)) {
+            return basePath;
+        }
+
+        // 策略1：在路径中添加更多层级的位置信息
+        const pathParts = basePath.split(' ');
+        let current = element;
+        const enhancedParts = [];
+
+        for (let i = pathParts.length - 1; i >= 0 && current; i--) {
+            const part = pathParts[i];
+            const parent = current.parentElement;
+
+            if (parent && !part.includes(':nth-child')) {
+                // 添加在同类型元素中的位置
+                const siblings = Array.from(parent.children)
+                    .filter(child => child.tagName === current.tagName);
+                
+                if (siblings.length > 1) {
+                    const index = siblings.indexOf(current) + 1;
+                    const enhancedPart = part + `:nth-child(${index})`;
+                    enhancedParts.unshift(enhancedPart);
+                } else {
+                    enhancedParts.unshift(part);
+                }
+            } else {
+                enhancedParts.unshift(part);
+            }
+
+            current = parent;
+        }
+
+        const enhancedPath = enhancedParts.join(' ');
+        if (this.isUnique(enhancedPath)) {
+            return enhancedPath;
+        }
+
+        // 策略2：使用更精确的类选择器组合
+        return this.generatePreciseClassPath(element);
+    }
+
+    generatePreciseClassPath(element) {
+        const path = [];
+        let current = element;
+        let depth = 0;
+        const maxDepth = 4;
+
+        while (current && depth < maxDepth) {
+            const tagName = current.tagName.toLowerCase();
+            
+            // 获取所有有意义的class，不限制数量
+            const allMeaningfulClasses = Array.from(current.classList || [])
+                .filter(cls => this.isMeaningfulClass(cls));
+
+            if (allMeaningfulClasses.length > 0) {
+                // 尝试不同的class组合，从最多到最少
+                for (let i = Math.min(allMeaningfulClasses.length, 3); i > 0; i--) {
+                    const classCombo = allMeaningfulClasses.slice(0, i);
+                    const selector = `${tagName}.${classCombo.join('.')}`;
+                    
+                    // 构建临时路径测试唯一性
+                    const tempPath = [selector, ...path].join(' ');
+                    if (this.isUnique(tempPath) && path.length >= 0) {
+                        path.unshift(selector);
+                        break;
+                    }
+                    
+                    // 如果是最后一次尝试，使用这个组合
+                    if (i === 1) {
+                        path.unshift(selector);
+                    }
+                }
+            } else {
+                // 没有有意义的class，添加位置信息
+                const parent = current.parentElement;
+                if (parent) {
+                    const siblings = Array.from(parent.children)
+                        .filter(child => child.tagName === current.tagName);
+                    if (siblings.length > 1) {
+                        const index = siblings.indexOf(current) + 1;
+                        path.unshift(`${tagName}:nth-child(${index})`);
+                    } else {
+                        path.unshift(tagName);
+                    }
+                } else {
+                    path.unshift(tagName);
+                }
+            }
+
+            // 检查当前路径是否已经唯一
+            const currentPath = path.join(' ');
+            if (this.isUnique(currentPath) && path.length > 1) {
+                return currentPath;
+            }
+
+            current = current.parentElement;
+            depth++;
+        }
+
+        return path.join(' ');
+    }
+
     getParentIdentifier(parent) {
         // 为父元素生成简洁的标识符
         if (!parent) return null;
@@ -637,9 +851,41 @@ class SelectorGenerator {
     }
 
     isMeaningfulClass(className) {
-        return this.isStableClass(className) &&
-            !className.startsWith('js-') && // 避免JavaScript钩子
-            !className.match(/^[a-z]-/); // 避免单字母前缀
+        // 基础检查
+        if (!this.isStableClass(className)) return false;
+        
+        // 排除JavaScript钩子和单字母前缀
+        if (className.startsWith('js-') || className.match(/^[a-z]-/)) {
+            return false;
+        }
+        
+        // Angular类的特殊处理
+        if (className.startsWith('ng-')) {
+            // 保留一些有意义的Angular类
+            const meaningfulNgClasses = [
+                'ng-star-inserted', // Angular结构指令
+                'ng-tns-', // Angular模板命名空间（通常是组件特定的）
+            ];
+            
+            return meaningfulNgClasses.some(prefix => className.startsWith(prefix));
+        }
+        
+        // 业务相关的class更有意义
+        const businessClasses = [
+            'submenu', 'menu-item', 'item-content', 'item-label', 
+            'grandchild-item', 'third-level', 'left', 'right',
+            'icon-wrapper'
+        ];
+        
+        if (businessClasses.includes(className)) {
+            return true;
+        }
+        
+        // 长度和复杂度检查（排除过于简单的class）
+        return className.length >= 4 && 
+               !className.match(/^[a-z]$/) && // 单字母
+               !className.match(/^[a-z]{1,2}\d+$/) && // 1-2字母+数字
+               this.digitRatio(className) < 0.3; // 数字比例不能太高
     }
 
     digitRatio(str) {
