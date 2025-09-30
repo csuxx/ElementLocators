@@ -23,12 +23,6 @@ class SelectorGenerator {
         return this.generateRobustSelector(element);
     }
 
-    // 设置消息监听器
-    // 只保留核心选择器生成功能，移除所有状态管理
-    generateSelector(element) {
-        return this.generateRobustSelector(element);
-    }
-
     // 开始选择器模式
     startPickingMode(settings) {
         if (settings) {
