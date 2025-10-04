@@ -9,7 +9,8 @@ let state = {
         showNotification: true,
         selectorType: 'smart'
     },
-    selectorGenerator: null
+    selectorGenerator: null,
+    currentSelector: '' // 添加当前选择器存储
 };
 
 // 初始化选择器生成器
@@ -66,11 +67,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             break;
 
         case 'selectorGenerated':
-            // 转发给popup
+            // 保存当前选择器并转发给popup
+            state.currentSelector = message.selector;
             chrome.runtime.sendMessage({
                 action: 'selectorGenerated',
                 selector: message.selector
             });
+            break;
+
+        case 'saveCurrentSelector':
+            // 保存当前选择器
+            state.currentSelector = message.selector;
+            break;
+
+        case 'getCurrentSelector':
+            // 返回当前选择器
+            sendResponse({ selector: state.currentSelector });
             break;
 
         case 'selectorCancelled':

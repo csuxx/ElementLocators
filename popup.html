@@ -58,6 +58,10 @@
             font-weight: bold;
             color: #5f6368;
             margin-bottom: 12px;
+            position: relative; /* 为复制按钮定位提供参考 */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .selector-display {
@@ -77,12 +81,11 @@
             resize: none;
             height: 60px;
             overflow-y: auto;
+            white-space: pre-wrap; /* 保持换行和空格 */
+            word-break: break-all; /* 允许在任意字符间断行 */
         }
 
         .copy-btn {
-            position: absolute;
-            right: 8px;
-            top: 8px;
             background-color: #4285f4;
             color: white;
             border: none;
@@ -90,7 +93,7 @@
             padding: 4px 8px;
             font-size: 12px;
             cursor: pointer;
-            opacity: 0.8;
+            opacity: 0.9;
             transition: opacity 0.2s;
         }
 
@@ -232,10 +235,12 @@
     </div>
 
     <div class="section">
-        <div class="section-title">当前选择器</div>
+        <div class="section-title">
+            当前选择器
+            <button class="copy-btn" id="copyBtn">复制</button>
+        </div>
         <div class="selector-display">
             <textarea class="selector-text" id="selectorText" readonly></textarea>
-            <button class="copy-btn" id="copyBtn">复制</button>
         </div>
 
         <div class="selector-types">

@@ -11,6 +11,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const autoCopyCheckbox = document.getElementById('autoCopy');
     const showHighlightCheckbox = document.getElementById('showHighlight');
     const showNotificationCheckbox = document.getElementById('showNotification');
+    
+    // 从background获取当前选择器
+    chrome.runtime.sendMessage({ action: 'getCurrentSelector' }, function(response) {
+        if (response && response.selector) {
+            updateSelector(response.selector);
+        }
+    });
 
     // 当前状态
     let currentSelector = '';
@@ -117,26 +124,34 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // 更新选择器
-    function updateSelector(element) {
-        // 根据选择器类型生成不同的选择器
-        let selector = '';
+    function updateSelector(selector) {
+        // 如果传入的是字符串，直接使用
+        if (typeof selector === 'string') {
+            selectorText.value = selector;
+            currentSelector = selector;
+            return;
+        }
+        
+        // 如果传入的是元素，则根据选择器类型生成不同的选择器
+        let selectorStr = '';
+        const element = selector;
 
         switch (currentSelectorType) {
             case 'id':
-                selector = element.id ? `#${CSS.escape(element.id)}` : '无法生成ID选择器（元素没有ID）';
+                selectorStr = element.id ? `#${CSS.escape(element.id)}` : '无法生成ID选择器（元素没有ID）';
                 break;
             case 'class':
                 if (element.classList && element.classList.length > 0) {
-                    selector = element.tagName.toLowerCase() + '.' + Array.from(element.classList).join('.');
+                    selectorStr = element.tagName.toLowerCase() + '.' + Array.from(element.classList).join('.');
                 } else {
-                    selector = '无法生成Class选择器（元素没有类名）';
+                    selectorStr = '无法生成Class选择器（元素没有类名）';
                 }
                 break;
             case 'xpath':
-                selector = getXPath(element);
+                selectorStr = getXPath(element);
                 break;
             case 'data':
-                selector = getDataAttributeSelector(element);
+                selectorStr = getDataAttributeSelector(element);
                 break;
             case 'smart':
             default:
@@ -149,8 +164,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         // 更新UI
-        selectorText.value = selector;
-        currentSelector = selector;
+        selectorText.value = selectorStr;
+        currentSelector = selectorStr;
 
         // 如果启用了自动复制，则复制到剪贴板
         if (autoCopyCheckbox.checked) {

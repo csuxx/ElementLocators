@@ -25,6 +25,14 @@ class SelectorGenerator {
 
     // 开始选择器模式
     startPickingMode(settings) {
+        // 如果已经在选择模式中，先停止当前的选择模式
+        if (this.isPickingMode) {
+            this.stopPickingMode();
+        }
+        
+        // 再次确保清除所有可能存在的高亮效果
+        this.removeAllHighlights();
+        
         if (settings) {
             this.updateSettings(settings);
         }
@@ -49,23 +57,36 @@ class SelectorGenerator {
     }
 
     setupEventListeners() {
+        // 存储绑定的事件处理函数引用，以便后续能正确移除
+        this.boundHandleClick = this.handleClick.bind(this);
+        this.boundHandleRightClick = this.handleRightClick.bind(this);
+        this.boundHandleHover = this.handleHover.bind(this);
+        this.boundHandleHoverOut = this.handleHoverOut.bind(this);
+        
         // 使用捕获阶段以确保在其他事件处理程序之前捕获事件
-        document.addEventListener('click', this.handleClick.bind(this), true);
+        document.addEventListener('click', this.boundHandleClick, true);
 
         // 添加右击事件监听，用于退出选择状态
-        document.addEventListener('contextmenu', this.handleRightClick.bind(this), true);
+        document.addEventListener('contextmenu', this.boundHandleRightClick, true);
 
         if (this.settings.showHighlight) {
-            document.addEventListener('mouseover', this.handleHover.bind(this));
-            document.addEventListener('mouseout', this.handleHoverOut.bind(this));
+            document.addEventListener('mouseover', this.boundHandleHover);
+            document.addEventListener('mouseout', this.boundHandleHoverOut);
         }
     }
 
     removeEventListeners() {
-        document.removeEventListener('click', this.handleClick.bind(this), true);
-        document.removeEventListener('contextmenu', this.handleRightClick.bind(this), true);
-        document.removeEventListener('mouseover', this.handleHover.bind(this));
-        document.removeEventListener('mouseout', this.handleHoverOut.bind(this));
+        // 使用存储的绑定函数引用来移除事件监听器
+        document.removeEventListener('click', this.boundHandleClick, true);
+        document.removeEventListener('contextmenu', this.boundHandleRightClick, true);
+        
+        if (this.boundHandleHover) {
+            document.removeEventListener('mouseover', this.boundHandleHover);
+        }
+        
+        if (this.boundHandleHoverOut) {
+            document.removeEventListener('mouseout', this.boundHandleHoverOut);
+        }
     }
 
     removeAllHighlights() {
@@ -110,9 +131,15 @@ class SelectorGenerator {
         // 生成选择器
         const selector = this.generateRobustSelector(e.target);
 
-        // 发送选择器到popup
+        // 发送选择器到popup和background
         chrome.runtime.sendMessage({
             action: 'selectorGenerated',
+            selector: selector
+        });
+
+        // 同时保存到background，确保popup重新打开时能获取到
+        chrome.runtime.sendMessage({
+            action: 'saveCurrentSelector',
             selector: selector
         });
 
