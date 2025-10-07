@@ -192,27 +192,27 @@ class SelectorGenerator {
 
         const strategies = [
             {
-                name: '稳定ID选择器',
+                name: '1、ID选择器',
                 func: () => this.tryStableIdSelector(element)
             },
             {
-                name: '数据属性选择器',
+                name: '2、数据属性选择器',
                 func: () => this.tryDataAttributesSelector(element)
             },
             {
-                name: '混合选择器',
+                name: '3、混合选择器',
                 func: () => this.tryHybridSelector(element)
             },
             {
-                name: '类选择器',
+                name: '4、类选择器',
                 func: () => this.tryRobustClassSelector(element)
             },
             {
-                name: '位置选择器',
+                name: '5、位置选择器',
                 func: () => this.tryNthChildSelector(element)
             },
             {
-                name: '路径选择器',
+                name: '6、路径选择器',
                 func: () => this.tryFallbackSelector(element)
             }
         ];
@@ -236,7 +236,7 @@ class SelectorGenerator {
         }
 
         console.log('所有策略都失败，使用绝对路径选择器');
-        this.lastStrategyUsed = '绝对路径选择器';
+        this.lastStrategyUsed = '7、绝对路径选择器';
         return this.generateUniquePath(element);
     }
 
