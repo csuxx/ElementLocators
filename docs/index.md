@@ -1,30 +1,7 @@
-# Privacy and Security Policy
+# Privacy Policy
 
-## Data Collection
-This browser extension only collects necessary operational data including:
-- Basic logs of user interactions
-- Anonymized performance metrics
-- Essential error reporting information
+Our Chrome Extension "ElementLocators" does not collect, store, or transmit any personal user data. All data processed by the extension remains on the user's local machine and is never sent to any external server.
 
-## Data Usage
-Collected data is used exclusively for:
-- Product improvement
-- Troubleshooting
-- User experience enhancement
+If you have any questions, please contact us at [csuxxx@gmail.com].
 
-## Data Protection
-We implement the following security measures:
-- TLS encryption for all data transmission
-- AES-256 encryption for stored data
-- Regular security audits
-
-## User Rights
-You have the right to:
-- Export your data at any time
-- Request deletion of personal data
-- Disable data collection features
-
-## Contact
-For privacy-related inquiries, please contact: csuxxx@gmail.com
-
-Last Updated: October 8, 2025
+Last updated: October 8, 2025
